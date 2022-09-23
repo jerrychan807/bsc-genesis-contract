@@ -11,17 +11,18 @@ contract TendermintLightClient is ILightClient, System, IParamSubscriber {
 
     struct ConsensusState {
         uint64 preValidatorSetChangeHeight; // 上一个验证者集合变更的高度
-        bytes32 appHash; // BC的根哈希
-        bytes32 curValidatorSetHash;
+        bytes32 appHash; // BC的Merkle根哈希
+                         // 对应bc的header.Block.Header.AppHash
+        bytes32 curValidatorSetHash; // 对应bc的header.Block.Header.ValidatorsHash
         bytes nextValidatorSet;
     }
 
-    mapping(uint64 => ConsensusState) public lightClientConsensusStates;
-    mapping(uint64 => address payable) public submitters;
+    mapping(uint64 => ConsensusState) public lightClientConsensusStates; // 区块高度height=>共识状态数据
+    mapping(uint64 => address payable) public submitters; // 区块高度height=>提交者地址
     uint64 public initialHeight; // 初始化高度
     uint64 public latestHeight;
-    bytes32 public chainID;
-
+    bytes32 public chainID; // 链标识符
+    // 初始化共识状态
     bytes constant public INIT_CONSENSUS_STATE_BYTES = hex"42696e616e63652d436861696e2d4e696c650000000000000000000000000000000000000000000229eca254b3859bffefaf85f4c95da9fbd26527766b784272789c30ec56b380b6eb96442aaab207bc59978ba3dd477690f5c5872334fc39e627723daa97e441e88ba4515150ec3182bc82593df36f8abb25a619187fcfab7e552b94e64ed2deed000000e8d4a51000";
     uint256 constant public INIT_REWARD_FOR_VALIDATOR_SER_CHANGE = 1e16; // 应该是0.01BNB
     uint256 public rewardForValidatorSetChange;

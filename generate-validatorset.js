@@ -6,14 +6,14 @@ const nunjucks = require("nunjucks");
 program.version("0.0.1");
 program.option(
     "-t, --template <template>",
-    "validatorSet template file",
+    "validatorSet template file", // 模板
     "./contracts/BSCValidatorSet.template"
 );
 
 program.option(
     "-o, --output <output-file>",
     "BSCValidatorSet.sol",
-    "./contracts/BSCValidatorSet.sol"
+    "./contracts/BSCValidatorSet.sol" // 生成合约
 )
 
 program.option(
