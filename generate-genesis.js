@@ -10,8 +10,8 @@ const init_holders = require("./init_holders")
 
 program.option("--bscChainId <bscChainId>",
     "bscChainId",
-    "0060");
-program.option("-c, --chainid <chainid>", "chain id", "714")
+    "02CA");  // 修改为714,对应的十六进制为02CA
+program.option("-c, --chainid <chainid>", "chain id", "714") // 修改为714
 
 program.option(
     "--initValidatorSetBytes <initValidatorSetBytes>",
@@ -63,14 +63,15 @@ function compileContract(key, contractFile, contractName) {
       "200",
       contractFile
     ])
-
+    // 从solc编译结果提取
     const result = []
     ls.stdout.on("data", data => {
+      // console.log(data.toString())
       result.push(data.toString())
     })
 
     ls.stderr.on("data", data => {
-      // console.log(`stderr: ${data}`)
+      console.log(`stderr: ${data}`)
     })
 
     ls.on("close", code => {
@@ -78,6 +79,8 @@ function compileContract(key, contractFile, contractName) {
       resolve(result.join(""))
     })
   }).then(compiledData => {
+    // console.log('===========')
+    // console.log(compiledData)
     compiledData = compiledData.replace(
       `======= ${contractFile}:${contractName} =======\nBinary of the runtime part:`,
       "@@@@"

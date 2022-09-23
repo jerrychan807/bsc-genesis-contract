@@ -20,12 +20,12 @@ program.option("--mock <mock>",
 
 program.option("--bscChainId <bscChainId>",
     "bscChainId",
-    "0060");
+    "02CA");
 
 program.parse(process.argv);
 
 const data = {
-  fromChainId: program.fromChainId,
+  fromChainId: program.fromChainId, // 这合约里面没有对应预留的模板变量
   bscChainId: program.bscChainId,
   mock: program.mock,
 };
