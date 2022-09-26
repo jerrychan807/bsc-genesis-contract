@@ -92,28 +92,40 @@ contract CrossChain is System, ICrossChain, IParamSubscriber {
         return key;
     }
 
+    // 初始化函数
+    // @dev 从System.sol读取配置变量,在registeredContractChannelMap映射中,建立channelId=>系统合约的映射
     function init() external onlyNotInit {
+        // TokenManager Contract | 跨链代币管理(绑定/解绑)合约 | 用于`BC`和`BSC`两边代币的绑定/解绑
+        // BIND_CHANNELID: 1
         channelHandlerContractMap[BIND_CHANNELID] = TOKEN_MANAGER_ADDR;
         isRelayRewardFromSystemReward[BIND_CHANNELID] = false;
         registeredContractChannelMap[TOKEN_MANAGER_ADDR][BIND_CHANNELID] = true;
 
+        // TokenHub Contract | 跨链代币转移合约 | 用于`BC`与`BSC`的跨链代币转移
+        // TRANSFER_IN_CHANNELID: 2
         channelHandlerContractMap[TRANSFER_IN_CHANNELID] = TOKEN_HUB_ADDR;
         isRelayRewardFromSystemReward[TRANSFER_IN_CHANNELID] = false;
         registeredContractChannelMap[TOKEN_HUB_ADDR][TRANSFER_IN_CHANNELID] = true;
 
+        // TRANSFER_OUT_CHANNELID: 3
         channelHandlerContractMap[TRANSFER_OUT_CHANNELID] = TOKEN_HUB_ADDR;
         isRelayRewardFromSystemReward[TRANSFER_OUT_CHANNELID] = false;
         registeredContractChannelMap[TOKEN_HUB_ADDR][TRANSFER_OUT_CHANNELID] = true;
 
-
+        // BSCValidatorSet Contract | 智能链验证者集合合约 | 用于 BC 更新 bsc-validator 验证者节点地址列表(查询or更新)
+        // STAKING_CHANNELID: 8
         channelHandlerContractMap[STAKING_CHANNELID] = VALIDATOR_CONTRACT_ADDR;
         isRelayRewardFromSystemReward[STAKING_CHANNELID] = true;
         registeredContractChannelMap[VALIDATOR_CONTRACT_ADDR][STAKING_CHANNELID] = true;
 
+        // GovHub Contract | 治理管理合约 | 处理来自`BC`上的链上治理数据包
+        // GOV_CHANNELID: 9
         channelHandlerContractMap[GOV_CHANNELID] = GOV_HUB_ADDR;
         isRelayRewardFromSystemReward[GOV_CHANNELID] = true;
         registeredContractChannelMap[GOV_HUB_ADDR][GOV_CHANNELID] = true;
 
+        // Liveness Slash Contract | 惩罚合约 |用于惩罚违规操作的 bsc-validator
+        // SLASH_CHANNELID: 11
         channelHandlerContractMap[SLASH_CHANNELID] = SLASH_CONTRACT_ADDR;
         isRelayRewardFromSystemReward[SLASH_CHANNELID] = true;
         registeredContractChannelMap[SLASH_CONTRACT_ADDR][SLASH_CHANNELID] = true;
@@ -189,18 +201,31 @@ contract CrossChain is System, ICrossChain, IParamSubscriber {
         return (true, packageType, relayFee, msgBytes);
     }
 
+    // 处理跨链数据包
+    // modifier检验:
+    //  onlyRelayer 仅允许中继器调用
+    //  sequenceInOrder 检验sequence序列号是否按顺序
+    //  blockSynced 在轻客户端合约中,该区块是否已经同步
+    //  channelSupported 该通道是否已经注册,相当于channelId白名单机制
+    // @param payload 编码过的跨链数据包
+    // @param proof
+    // @param height 区块高度
+    // @param packageSequence 跨链数据包序列号
+    // @param channelId 通道ID
     function handlePackage(bytes calldata payload, bytes calldata proof, uint64 height, uint64 packageSequence, uint8 channelId) onlyInit onlyRelayer
     sequenceInOrder(packageSequence, channelId) blockSynced(height) channelSupported(channelId) external {
         bytes memory payloadLocal = payload;
         // fix error: stack too deep, try removing local variables
         bytes memory proofLocal = proof;
         // fix error: stack too deep, try removing local variables
+        // 默克尔树根校验
         require(MerkleProof.validateMerkleProof(ILightClient(LIGHT_CLIENT_ADDR).getAppHash(height), STORE_NAME, generateKey(packageSequence, channelId), payloadLocal, proofLocal), "invalid merkle proof");
-
+        // 同步该区块的中继器地址
         address payable headerRelayer = ILightClient(LIGHT_CLIENT_ADDR).getSubmitter(height);
 
         uint8 channelIdLocal = channelId;
         // fix error: stack too deep, try removing local variables
+        // 解码跨链数据包
         (bool success, uint8 packageType, uint256 relayFee, bytes memory msgBytes) = decodePayloadHeader(payloadLocal);
         if (!success) {
             emit unsupportedPackage(packageSequence, channelIdLocal, payloadLocal);
@@ -208,7 +233,9 @@ contract CrossChain is System, ICrossChain, IParamSubscriber {
         }
         emit receivedPackage(packageType, packageSequence, channelIdLocal);
         if (packageType == SYN_PACKAGE) {
+            // 根据channelId获取对应的系统合约地址
             address handlerContract = channelHandlerContractMap[channelIdLocal];
+            // 调用具体的系统合约处理跨链数据包
             try IApplication(handlerContract).handleSynPackage(channelIdLocal, msgBytes) returns (bytes memory responsePayload) {
                 if (responsePayload.length != 0) {
                     sendPackage(channelSendSequenceMap[channelIdLocal], channelIdLocal, encodePayload(ACK_PACKAGE, 0, responsePayload));
