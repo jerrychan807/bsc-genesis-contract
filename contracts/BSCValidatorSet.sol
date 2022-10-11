@@ -244,6 +244,7 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
         return CODE_OK;
     }
 
+    // 更新验证者集合
     function updateValidatorSet(Validator[] memory validatorSet) internal returns (uint32) {
         {
             // do verify.
@@ -255,16 +256,18 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
         }
 
         // step 0: force all maintaining validators to exit `Temporary Maintenance`
-        // - 1. validators exit maintenance
-        // - 2. clear all maintainInfo
-        // - 3. get unjailed validators from validatorSet
+        // - 1. validators exit maintenance 验证者退出维护状态
+        // - 2. clear all maintainInfo  清除所有维护信息
+        // - 3. get unjailed validators from validatorSet 从验证者集合中获取未被监禁的验证者
         Validator[] memory validatorSetTemp = _forceMaintainingValidatorsExit(validatorSet);
 
-        //step 1: do calculate distribution, do not make it as an internal function for saving gas.
+        // step 1: do calculate distribution, do not make it as an internal function for saving gas.
+        // calculate distribution 计算分配
         uint crossSize;
         uint directSize;
         uint validatorsNum = currentValidatorSet.length;
         for (uint i; i < validatorsNum; ++i) {
+            // DUSTY_INCOMING = 0.1bnb
             if (currentValidatorSet[i].incoming >= DUSTY_INCOMING) {
                 crossSize ++;
             } else if (currentValidatorSet[i].incoming > 0) {
@@ -272,7 +275,7 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
             }
         }
 
-        //cross transfer
+        // cross transfer 跨链转账
         address[] memory crossAddrs = new address[](crossSize);
         uint256[] memory crossAmounts = new uint256[](crossSize);
         uint256[] memory crossIndexes = new uint256[](crossSize);
@@ -289,12 +292,16 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
             return ERROR_RELAYFEE_TOO_LARGE;
         }
         for (uint i; i < validatorsNum; ++i) {
+            // 验证者的收入 > 0.1bnb, 则进行跨链转账
             if (currentValidatorSet[i].incoming >= DUSTY_INCOMING) {
+                // 验证者的BC收款地址
                 crossAddrs[crossSize] = currentValidatorSet[i].BBCFeeAddress;
                 uint256 value = currentValidatorSet[i].incoming - currentValidatorSet[i].incoming % PRECISION;
+                // 减去跨链手续费
                 crossAmounts[crossSize] = value.sub(relayFee);
                 crossRefundAddrs[crossSize] = currentValidatorSet[i].BBCFeeAddress;
                 crossIndexes[crossSize] = i;
+                // 跨链转账总额
                 crossTotal = crossTotal.add(value);
                 crossSize ++;
             } else if (currentValidatorSet[i].incoming > 0) {
@@ -307,6 +314,7 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
         //step 2: do cross chain transfer
         bool failCross = false;
         if (crossTotal > 0) {
+            // 跨链转账: 将跨链转账总额转到TOKEN_HUB合约中,调用它的batchTransferOutBNB函数
             try ITokenHub(TOKEN_HUB_ADDR).batchTransferOutBNB{value : crossTotal}(crossAddrs, crossAmounts, crossRefundAddrs, uint64(block.timestamp + expireTimeSecondGap)) returns (bool success) {
                 if (success) {
                     emit batchTransfer(crossTotal);
@@ -335,6 +343,7 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
         }
 
         // step 3: direct transfer
+        // 收入少的话则,直接转账: 将验证者的收入转到验证者的收款地址中
         if (directAddrs.length > 0) {
             for (uint i; i < directAddrs.length; ++i) {
                 bool success = directAddrs[i].send(directAmounts[i]);
@@ -347,11 +356,14 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
         }
 
         // step 4: do dusk transfer
+        // 应该是把合约里剩余的零钱转走
         if (address(this).balance > 0) {
             emit systemTransfer(address(this).balance);
+            // 发送bnb到SYSTEM_REWARD_ADDR
             address(uint160(SYSTEM_REWARD_ADDR)).transfer(address(this).balance);
         }
         // step 5: do update validator set state
+        // 更新验证者集合状态
         totalInComing = 0;
         numOfJailed = 0;
         if (validatorSetTemp.length > 0) {
@@ -359,6 +371,7 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
         }
 
         // step 6: clean slash contract
+        // 清空惩罚slash合约状态
         ISlashIndicator(SLASH_CONTRACT_ADDR).clean();
         emit validatorSetUpdated();
         return CODE_OK;
@@ -593,6 +606,7 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
     /*********************** Internal Functions **************************/
 
     function checkValidatorSet(Validator[] memory validatorSet) private pure returns (bool, string memory) {
+        // 长度不能超过最大值
         if (validatorSet.length > MAX_NUM_OF_VALIDATORS) {
             return (false, "the number of validators exceed the limit");
         }
@@ -631,6 +645,7 @@ contract BSCValidatorSet is IBSCValidatorSet, System, IParamSubscriber, IApplica
             }
         }
         uint k = n < m ? n : m;
+        // for循环修改currentValidatorSet 验证者集合
         for (uint i; i < k; ++i) {
             if (!isSameValidator(validatorSet[i], currentValidatorSet[i])) {
                 currentValidatorSetMap[validatorSet[i].consensusAddress] = i + 1;
