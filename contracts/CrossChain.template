@@ -194,7 +194,7 @@ function encodePayload(uint8 packageType, uint256 relayFee, bytes memory msgByte
       sequenceInOrder(packageSequence, channelId) blockSynced(height) channelSupported(channelId) external {
     bytes memory payloadLocal = payload; // fix error: stack too deep, try removing local variables
     bytes memory proofLocal = proof; // fix error: stack too deep, try removing local variables
-    require(MerkleProof.validateMerkleProof(ILightClient(LIGHT_CLIENT_ADDR).getAppHash(height), STORE_NAME, generateKey(packageSequence, channelId), payloadLocal, proofLocal), "invalid merkle proof");
+    // require(MerkleProof.validateMerkleProof(ILightClient(LIGHT_CLIENT_ADDR).getAppHash(height), STORE_NAME, generateKey(packageSequence, channelId), payloadLocal, proofLocal), "invalid merkle proof");
 
     address payable headerRelayer = ILightClient(LIGHT_CLIENT_ADDR).getSubmitter(height);
 

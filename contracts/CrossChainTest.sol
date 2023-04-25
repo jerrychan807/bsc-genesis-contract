@@ -219,7 +219,7 @@ contract CrossChain is System, ICrossChain, IParamSubscriber {
         bytes memory proofLocal = proof;
         // fix error: stack too deep, try removing local variables
         // 默克尔树根校验
-        require(MerkleProof.validateMerkleProof(ILightClient(LIGHT_CLIENT_ADDR).getAppHash(height), STORE_NAME, generateKey(packageSequence, channelId), payloadLocal, proofLocal), "invalid merkle proof");
+//        require(MerkleProof.validateMerkleProof(ILightClient(LIGHT_CLIENT_ADDR).getAppHash(height), STORE_NAME, generateKey(packageSequence, channelId), payloadLocal, proofLocal), "invalid merkle proof");
         // 同步该区块的中继器地址
         address payable headerRelayer = ILightClient(LIGHT_CLIENT_ADDR).getSubmitter(height);
 
@@ -270,6 +270,27 @@ contract CrossChain is System, ICrossChain, IParamSubscriber {
         IRelayerIncentivize(INCENTIVIZE_ADDR).addReward(headerRelayer, msg.sender, relayFee, isRelayRewardFromSystemReward[channelIdLocal] || packageType != SYN_PACKAGE);
     }
 
+    function handlePackageTemp(bytes calldata payload, bytes calldata proof, uint64 height, uint64 packageSequence, uint8 channelId) onlyInit sequenceInOrder(packageSequence, channelId) blockSynced(height) channelSupported(channelId) external {
+        bytes memory payloadLocal = payload;
+        // fix error: stack too deep, try removing local variables
+        bytes memory proofLocal = proof;
+        // fix error: stack too deep, try removing local variables
+        // 默克尔树根校验
+//        require(MerkleProof.validateMerkleProof(ILightClient(LIGHT_CLIENT_ADDR).getAppHash(height), STORE_NAME, generateKey(packageSequence, channelId), payloadLocal, proofLocal), "invalid merkle proof");
+        // 同步该区块的中继器地址
+        address payable headerRelayer = ILightClient(LIGHT_CLIENT_ADDR).getSubmitter(height);
+
+        uint8 channelIdLocal = channelId;
+        // fix error: stack too deep, try removing local variables
+        // 解码跨链数据包
+        (bool success, uint8 packageType, uint256 relayFee, bytes memory msgBytes) = decodePayloadHeader(payloadLocal);
+        if (!success) {
+            emit unsupportedPackage(packageSequence, channelIdLocal, payloadLocal);
+            return;
+        }
+        emit receivedPackage(packageType, packageSequence, channelIdLocal);
+    }
+
     function sendPackage(uint64 packageSequence, uint8 channelId, bytes memory payload) internal {
         if (block.number > previousTxHeight) {
             oracleSequence++;
@@ -285,7 +306,6 @@ contract CrossChain is System, ICrossChain, IParamSubscriber {
         emit crossChainPackage(bscChainID, uint64(oracleSequence), packageSequence, channelId, payload);
     }
 
-    // 发送同步包
     function sendSynPackage(uint8 channelId, bytes calldata msgBytes, uint256 relayFee) onlyInit onlyRegisteredContractChannel(channelId) external override {
         uint64 sendSequence = channelSendSequenceMap[channelId];
         sendPackage(sendSequence, channelId, encodePayload(SYN_PACKAGE, relayFee, msgBytes));

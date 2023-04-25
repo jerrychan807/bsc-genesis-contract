@@ -428,9 +428,11 @@ contract TokenHub is ITokenHub, System, IParamSubscriber, IApplication, ISystemR
     }
 
     function batchTransferOutBNB(address[] calldata recipientAddrs, uint256[] calldata amounts, address[] calldata refundAddrs, uint64 expireTime) external override onlyInit payable returns (bool) {
+        // 数组长度必须相等
         require(recipientAddrs.length == amounts.length, "Length of recipientAddrs doesn't equal to length of amounts");
         require(recipientAddrs.length == refundAddrs.length, "Length of recipientAddrs doesn't equal to length of refundAddrs");
         require(expireTime >= block.timestamp + 120, "expireTime must be two minutes later");
+        // 精度损失检查
         require(msg.value % TEN_DECIMALS == 0, "invalid received BNB amount: precision loss in amount conversion");
         uint256 batchLength = amounts.length;
         uint256 totalAmount = 0;
@@ -443,15 +445,16 @@ contract TokenHub is ITokenHub, System, IParamSubscriber, IApplication, ISystemR
         }
         require(msg.value >= totalAmount.add(relayFee.mul(batchLength)), "received BNB amount should be no less than the sum of transfer BNB amount and relayFee");
         rewardForRelayer = msg.value.sub(totalAmount);
-
+        // 构造同步包 代币转出同步包
         TransferOutSynPackage memory transOutSynPkg = TransferOutSynPackage({
         bep2TokenSymbol : BEP2_TOKEN_SYMBOL_FOR_BNB,
-        contractAddr : address(0x00),
-        amounts : convertedAmounts,
-        recipients : recipientAddrs,
-        refundAddrs : refundAddrs,
-        expireTime : expireTime
+        contractAddr : address(0x00), // 销毁地址
+        amounts : convertedAmounts, // 转出数量
+        recipients : recipientAddrs, // 转出地址
+        refundAddrs : refundAddrs, // 退款地址
+        expireTime : expireTime // 过期时间
         });
+        // 调用CrossChain合约的sendSynPackage
         ICrossChain(CROSS_CHAIN_CONTRACT_ADDR).sendSynPackage(TRANSFER_OUT_CHANNELID, encodeTransferOutSynPackage(transOutSynPkg), rewardForRelayer.div(TEN_DECIMALS));
         emit transferOutSuccess(address(0x0), msg.sender, totalAmount, rewardForRelayer);
         return true;

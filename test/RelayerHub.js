@@ -2,7 +2,8 @@ const RelayerHub = artifacts.require("RelayerHub");
 const SystemReward = artifacts.require("SystemReward");
 const Web3 = require('web3');
 const truffleAssert = require('truffle-assertions');
-const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'));
+// const web3 = new Web3(new Web3.providers.HttpProvider('http://localhost:8545'));
+const web3 = new Web3(new Web3.providers.HttpProvider('http://192.168.2.21:8545'));
 
 contract('RelayerHub', (accounts) => {
   it('register and unregister success', async () => {
